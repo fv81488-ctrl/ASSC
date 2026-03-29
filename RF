@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G-80 RF Dual-Band — محاكاة الدائرة الكاملة</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap');
+:root {
+  --bg:#04060d; --panel:#080d1a; --card:#0c1225; --border:#1a2a45;
+  --gold:#c9a84c; --gold2:#e8d08a; --green:#00c853; --green2:#69f0ae;
+  --red:#ff1744; --amber:#ff9800; --cyan:#00bcd4; --blue:#1565c0;
+  --purple:#7c4dff; --pink:#f50057; --text:#dce8f5; --muted:#6a7f9a;
+  --esp:#ffd700; --rf:#00bcd4; --crypto:#7c4dff; --audio:#ff9800;
+  --display:#00e676; --power:#ff5722;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Tajawal',sans-serif;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,200,83,.008)0,transparent 2px,transparent 4px),
+  radial-gradient(ellipse 60% 50% at 15% 15%,rgba(0,188,212,.06)0,transparent 60%),
+  radial-gradient(ellipse 50% 60% at 85% 85%,rgba(124,77,255,.05)0,transparent 60%)}
+
+/* HEADER */
+header{position:sticky;top:0;z-index:100;background:rgba(4,6,13,.95);backdrop-filter:blur(20px);
+border-bottom:1px solid var(–border);padding:0 1.5rem}
+.hdr{display:flex;align-items:center;justify-content:space-between;height:60px;max-width:1800px;margin:0 auto;gap:1rem}
+.htitle{font-size:1rem;font-weight:900;color:var(–gold);font-family:‘JetBrains Mono’,monospace;letter-spacing:.05em}
+.hsub{font-size:.68rem;color:var(–muted)}
+.tabs{display:flex;gap:4px;background:rgba(255,255,255,.04);border-radius:10px;padding:4px}
+.tab{padding:6px 16px;border-radius:7px;border:none;background:transparent;color:var(–muted);
+cursor:pointer;font-family:‘Tajawal’,sans-serif;font-size:.82rem;transition:all .2s}
+.tab.active{background:var(–gold);color:#000;font-weight:700}
+.tab:hover:not(.active){color:var(–text);background:rgba(255,255,255,.06)}
+
+/* MAIN */
+main{max-width:1800px;margin:0 auto;padding:1.2rem;position:relative;z-index:1}
+.page{display:none}.page.active{display:block;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* CARDS */
+.card{background:var(–card);border:1px solid var(–border);border-radius:14px;padding:1.2rem;position:relative;overflow:hidden}
+.card::before{content:’’;position:absolute;inset:0;border-radius:14px;
+background:linear-gradient(135deg,rgba(201,168,76,.02)0,transparent 50%);pointer-events:none}
+.ctitle{font-size:.78rem;font-weight:700;color:var(–gold);letter-spacing:.06em;text-transform:uppercase;
+margin-bottom:1rem;display:flex;align-items:center;gap:7px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+
+/* SCHEMATIC CANVAS */
+#sch-canvas{width:100%;height:600px;border-radius:12px;cursor:crosshair;display:block}
+.sch-wrap{background:#fafbfc;border-radius:12px;position:relative;border:2px solid var(–border)}
+.sch-overlay{position:absolute;inset:0;border-radius:12px;pointer-events:none}
+.err-badge{position:absolute;background:rgba(255,23,68,.9);color:#fff;font-size:.62rem;
+font-weight:700;padding:2px 6px;border-radius:4px;cursor:pointer;pointer-events:all;
+animation:errPulse 1.5s infinite;font-family:‘JetBrains Mono’,monospace}
+.fix-badge{position:absolute;background:rgba(0,200,83,.9);color:#000;font-size:.62rem;
+font-weight:700;padding:2px 6px;border-radius:4px;pointer-events:all;font-family:‘JetBrains Mono’,monospace}
+@keyframes errPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,23,68,.6)}50%{box-shadow:0 0 0 6px rgba(255,23,68,0)}}
+
+/* SIMULATION CANVAS */
+#sim-canvas{width:100%;height:560px;border-radius:12px;display:block;cursor:pointer}
+
+/* COMPONENT INFO */
+.comp-info{background:var(–panel);border:1px solid var(–border);border-radius:10px;padding:1rem;font-size:.8rem}
+.comp-name{font-size:1rem;font-weight:700;color:var(–gold);margin-bottom:.5rem}
+.comp-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.comp-row:last-child{border-bottom:none}
+.comp-key{color:var(–muted);font-size:.75rem}
+.comp-val{color:var(–text);font-size:.75rem;font-family:‘JetBrains Mono’,monospace;font-weight:700}
+
+/* ERROR LIST */
+.err-list{display:flex;flex-direction:column;gap:.6rem;max-height:400px;overflow-y:auto}
+.err-item{display:flex;gap:10px;padding:10px 12px;border-radius:8px;border-left:3px solid}
+.err-item.err{border-color:var(–red);background:rgba(255,23,68,.06)}
+.err-item.fix{border-color:var(–green);background:rgba(0,200,83,.06)}
+.err-item.warn{border-color:var(–amber);background:rgba(255,152,0,.06)}
+.err-item.add{border-color:var(–cyan);background:rgba(0,188,212,.06)}
+.err-ico{font-size:1.1rem;flex-shrink:0}
+.err-title{font-weight:700;font-size:.82rem;margin-bottom:2px}
+.err-item.err .err-title{color:var(–red)}
+.err-item.fix .err-title{color:var(–green)}
+.err-item.warn .err-title{color:var(–amber)}
+.err-item.add .err-title{color:var(–cyan)}
+.err-desc{font-size:.73rem;color:var(–muted);line-height:1.6}
+
+/* SIGNAL PATH */
+.sig-path{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:1rem 0}
+.sig-block{padding:8px 14px;border-radius:8px;font-size:.75rem;font-weight:700;text-align:center;
+position:relative;min-width:90px;cursor:pointer;transition:all .2s}
+.sig-block:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.sig-arrow{font-size:.9rem;color:var(–muted);margin:0 4px;flex-shrink:0}
+.sig-block.mic{background:rgba(255,152,0,.15);border:1px solid var(–amber);color:var(–amber)}
+.sig-block.adc{background:rgba(255,87,34,.15);border:1px solid var(–power);color:var(–power)}
+.sig-block.codec{background:rgba(255,215,0,.15);border:1px solid var(–esp);color:var(–esp)}
+.sig-block.enc{background:rgba(124,77,255,.15);border:1px solid var(–purple);color:var(–purple)}
+.sig-block.pll{background:rgba(0,188,212,.15);border:1px solid var(–cyan);color:var(–cyan)}
+.sig-block.pa{background:rgba(0,200,83,.15);border:1px solid var(–green);color:var(–green)}
+.sig-block.ant{background:rgba(201,168,76,.15);border:1px solid var(–gold);color:var(–gold)}
+.sig-block.spk{background:rgba(255,152,0,.15);border:1px solid var(–amber);color:var(–amber)}
+.sig-block.disp{background:rgba(0,230,118,.15);border:1px solid var(–display);color:var(–display)}
+
+/* FREQ DISPLAY */
+.freq-dial{background:rgba(0,0,0,.4);border:1px solid var(–border);border-radius:10px;padding:1.2rem;text-align:center}
+.freq-num{font-family:‘JetBrains Mono’,monospace;font-size:2rem;font-weight:700;line-height:1}
+.freq-unit{font-size:.8rem;color:var(–muted);margin-top:4px}
+.freq-bar{height:4px;border-radius:2px;margin-top:12px;background:linear-gradient(90deg,var(–cyan),var(–green))}
+
+/* WAVEFORM */
+#wave-canvas{width:100%;height:120px;border-radius:8px;background:rgba(0,0,0,.4)}
+#enc-canvas{width:100%;height:120px;border-radius:8px;background:rgba(0,0,0,.4)}
+#fhss-canvas{width:100%;height:100px;border-radius:8px;background:rgba(0,0,0,.4)}
+
+/* CONTROLS */
+.ctrl-btn{padding:8px 18px;border-radius:8px;border:1px solid;cursor:pointer;font-family:‘Tajawal’,sans-serif;
+font-size:.82rem;transition:all .2s}
+.btn-grn{border-color:var(–green);background:rgba(0,200,83,.1);color:var(–green)}
+.btn-grn:hover{background:rgba(0,200,83,.25)}
+.btn-red{border-color:var(–red);background:rgba(255,23,68,.1);color:var(–red)}
+.btn-red:hover{background:rgba(255,23,68,.25)}
+.btn-cyan{border-color:var(–cyan);background:rgba(0,188,212,.1);color:var(–cyan)}
+.btn-cyan:hover{background:rgba(0,188,212,.25)}
+.btn-gold{border-color:var(–gold);background:rgba(201,168,76,.1);color:var(–gold)}
+.btn-gold:hover{background:rgba(201,168,76,.25)}
+
+/* STATUS PILLS */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:100px;
+font-size:.7rem;font-weight:700;border:1px solid;font-family:‘JetBrains Mono’,monospace}
+.pg{border-color:var(–green);color:var(–green);background:rgba(0,200,83,.08)}
+.pc{border-color:var(–cyan);color:var(–cyan);background:rgba(0,188,212,.08)}
+.pp{border-color:var(–purple);color:var(–purple);background:rgba(124,77,255,.08)}
+.pa2{border-color:var(–amber);color:var(–amber);background:rgba(255,152,0,.08)}
+.pdot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:blink 1.3s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* DEVICE MOCKUP */
+.device-frame{background:linear-gradient(145deg,#1a1a2e,#16213e);border:3px solid #2a2a4e;
+border-radius:20px;padding:12px;width:280px;margin:0 auto;position:relative;
+box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05)}
+.device-screen{background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9;
+border:2px solid #111;position:relative}
+.device-antenna{width:4px;height:40px;background:linear-gradient(to top,#666,#aaa);
+border-radius:2px;position:absolute;top:-45px;right:20px}
+.device-btn{width:20px;height:20px;background:var(–gold);border-radius:50%;
+position:absolute;right:-12px;top:50%;transform:translateY(-50%);
+box-shadow:0 0 10px var(–gold);cursor:pointer;border:none}
+.device-btn:active{box-shadow:0 0 20px var(–gold)}
+.device-speaker{width:60px;height:6px;background:repeating-linear-gradient(90deg,#333 0,#333 3px,transparent 3px,transparent 6px);
+border-radius:3px;margin:8px auto 0}
+.device-mic{width:6px;height:6px;background:#333;border-radius:50%;position:absolute;bottom:6px;left:50%;transform:translateX(-50%)}
+
+/* SCREEN CONTENT */
+.screen-ui{padding:6px;color:#0f0;font-family:‘JetBrains Mono’,monospace;font-size:.6rem;height:100%;
+background:linear-gradient(135deg,#000810,#001020)}
+.screen-line{padding:1px 0;border-bottom:1px solid rgba(0,255,0,.05)}
+.screen-header{color:var(–gold);font-weight:700;font-size:.65rem;text-align:center;padding:3px 0;
+border-bottom:1px solid rgba(201,168,76,.2);margin-bottom:4px}
+#screen-status{color:var(–green)}
+#screen-freq{color:var(–cyan)}
+#screen-enc{color:var(–purple)}
+#screen-rssi{color:var(–amber)}
+#screen-batt{color:var(–green2)}
+
+/* SPEC TABLE */
+.spec-table{width:100%;border-collapse:collapse}
+.spec-table th{padding:8px 12px;text-align:right;font-size:.72rem;color:var(–muted);
+border-bottom:1px solid var(–border);background:rgba(0,0,0,.3);font-family:‘JetBrains Mono’,monospace;text-transform:uppercase}
+.spec-table td{padding:9px 12px;font-size:.78rem;border-bottom:1px solid rgba(26,42,69,.4);vertical-align:middle}
+.spec-table tr:hover td{background:rgba(255,255,255,.02)}
+.spec-comp{font-weight:700;color:var(–text)}
+.spec-id{font-family:‘JetBrains Mono’,monospace;font-size:.7rem;color:var(–gold)}
+.spec-desc{color:var(–muted);font-size:.73rem}
+.tag{display:inline-block;padding:2px 8px;border-radius:100px;font-size:.65rem;font-weight:700;margin:1px}
+.tg{background:rgba(0,200,83,.15);color:var(–green);border:1px solid rgba(0,200,83,.3)}
+.tr{background:rgba(255,23,68,.15);color:var(–red);border:1px solid rgba(255,23,68,.3)}
+.tc{background:rgba(0,188,212,.15);color:var(–cyan);border:1px solid rgba(0,188,212,.3)}
+.tp{background:rgba(124,77,255,.15);color:var(–purple);border:1px solid rgba(124,77,255,.3)}
+.ta{background:rgba(255,152,0,.15);color:var(–amber);border:1px solid rgba(255,152,0,.3)}
+
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(–border);border-radius:3px}
+</style>
+
+</head>
+<body>
+
+<header>
+<div class="hdr">
+  <div>
+    <div class="htitle">⚡ G-80 RF DUAL-BAND — محاكاة الدائرة الكاملة</div>
+    <div class="hsub">ADF4352 + ESP32-S3 + ATECC608A · ترددين · تشفير عتادي</div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showPage('schematic')">📐 المخطط المُصحَّح</button>
+    <button class="tab" onclick="showPage('simulation')">⚡ المحاكاة الحية</button>
+    <button class="tab" onclick="showPage('errors')">🔴 الأخطاء والإصلاح</button>
+    <button class="tab" onclick="showPage('specs')">📋 المواصفات</button>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <span class="pill pg"><span class="pdot"></span>نشط</span>
+    <span class="pill pc">ADF4352</span>
+    <span class="pill pp">AES-GCM</span>
+  </div>
+</div>
+</header>
+
+<main>
+
+<!-- ════ PAGE 1: SCHEMATIC ════ -->
+
+<div class="page active" id="page-schematic">
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:1.2rem;align-items:start">
+    <div class="card">
+      <div class="ctitle">📐 المخطط الكهربائي المُصحَّح والمُطوَّر</div>
+      <div class="sch-wrap">
+        <canvas id="sch-canvas"></canvas>
+        <div class="sch-overlay" id="schOverlay"></div>
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem">
+        <button class="ctrl-btn btn-grn" onclick="toggleFixes()">✓ إظهار الإصلاحات</button>
+        <button class="ctrl-btn btn-red" onclick="toggleErrors()">✕ إظهار الأخطاء</button>
+        <button class="ctrl-btn btn-cyan" onclick="animateSignal()">▶ تحريك الإشارة</button>
+        <button class="ctrl-btn btn-gold" onclick="resetSchematic()">↺ إعادة ضبط</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div class="comp-info" id="compInfo">
+        <div class="comp-name">🖱️ انقر على مكوّن</div>
+        <div style="color:var(--muted);font-size:.75rem">انقر على أي مكوّن في المخطط لعرض تفاصيله الفنية</div>
+      </div>
+      <div class="card">
+        <div class="ctitle">🎯 المكونات الرئيسية</div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.75rem">
+          <div onclick="showComp('esp32')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);color:var(--esp)">🟡 U9 — ESP32-S3 (المعالج الرئيسي)</div>
+          <div onclick="showComp('adf')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(0,188,212,.08);border:1px solid rgba(0,188,212,.2);color:var(--cyan)">🔵 U7 — ADF4352 (مُولِّد التردد PLL)</div>
+          <div onclick="showComp('atec')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(124,77,255,.08);border:1px solid rgba(124,77,255,.2);color:var(--purple)">🟣 U1 — ATECC608A (تشفير عتادي)</div>
+          <div onclick="showComp('maam')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(0,200,83,.08);border:1px solid rgba(0,200,83,.2);color:var(--green)">🟢 U6 — MAAM-007221 (مُضخِّم MMIC)</div>
+          <div onclick="showComp('sky')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(255,87,34,.08);border:1px solid rgba(255,87,34,.2);color:var(--power)">🟠 U5 — SKY65404 (مبدِّل RF)</div>
+          <div onclick="showComp('mic')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(255,152,0,.08);border:1px solid rgba(255,152,0,.2);color:var(--amber)">🟡 MIC — INMP441 (ميكروفون I2S) ★جديد</div>
+          <div onclick="showComp('spk')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(255,152,0,.08);border:1px solid rgba(255,152,0,.2);color:var(--amber)">🔊 U10 — MAX98357A (مكبر صوت) ★جديد</div>
+          <div onclick="showComp('disp')" style="cursor:pointer;padding:6px 10px;border-radius:7px;background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);color:var(--display)">📺 LCD — ST7789V (شاشة TFT) ★جديد</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 2: SIMULATION ════ -->
+
+<div class="page" id="page-simulation">
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:1.2rem">
+    <div>
+      <div class="card" style="margin-bottom:1rem">
+        <div class="ctitle">⚡ محاكاة الدائرة الحية</div>
+        <canvas id="sim-canvas" onclick="toggleTransmit()"></canvas>
+        <div style="display:flex;gap:.6rem;margin-top:.8rem;flex-wrap:wrap;align-items:center">
+          <button class="ctrl-btn btn-grn" id="txBtn" onclick="toggleTransmit()">▶ إرسال</button>
+          <button class="ctrl-btn btn-cyan" onclick="toggleBand()">🔄 تبديل التردد</button>
+          <button class="ctrl-btn btn-purple" onclick="triggerEncrypt()" style="border-color:var(--purple);background:rgba(124,77,255,.1);color:var(--purple)">🔒 تشفير</button>
+          <span id="txStatus" class="pill pg" style="display:none"><span class="pdot"></span>جارٍ الإرسال</span>
+        </div>
+      </div>
+
+```
+  <div class="grid2" style="margin-bottom:1rem">
+    <div class="card">
+      <div class="ctitle">🎵 الإشارة الصوتية (Codec2)</div>
+      <canvas id="wave-canvas"></canvas>
+      <div style="display:flex;justify-content:space-between;margin-top:.5rem;font-size:.7rem;font-family:'JetBrains Mono',monospace">
+        <span style="color:var(--muted)">8 kHz · 16-bit · Mono</span>
+        <span style="color:var(--amber)">1200 bps Codec2</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ctitle">🔒 الإشارة المشفرة (AES-128-GCM)</div>
+      <canvas id="enc-canvas"></canvas>
+      <div style="display:flex;justify-content:space-between;margin-top:.5rem;font-size:.7rem;font-family:'JetBrains Mono',monospace">
+        <span style="color:var(--muted)">ATECC608A in-silicon</span>
+        <span style="color:var(--purple)" id="encTag">Tag: 0x—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📡 طيف FHSS — القفز الترددي</div>
+    <canvas id="fhss-canvas"></canvas>
+    <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:4px">
+      <span>137.5 MHz</span><span>868 MHz</span><span>1.2 GHz</span><span>2.4 GHz</span><span>4.4 GHz</span>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div style="display:flex;flex-direction:column;gap:1rem">
+
+  <!-- Device Mockup -->
+  <div class="card">
+    <div class="ctitle">📱 الجهاز</div>
+    <div class="device-frame">
+      <div class="device-antenna"></div>
+      <div class="device-screen">
+        <div class="screen-ui">
+          <div class="screen-header">⚡ G-80 TACTICAL</div>
+          <div class="screen-line" id="screen-status">● STATUS: STANDBY</div>
+          <div class="screen-line" id="screen-freq">📡 FREQ: 868.0 MHz</div>
+          <div class="screen-line" id="screen-enc">🔒 AES-GCM: ACTIVE</div>
+          <div class="screen-line" id="screen-rssi">📶 RSSI: -68 dBm</div>
+          <div class="screen-line" id="screen-batt">🔋 BATT: 87%</div>
+          <div class="screen-line" id="screen-ch">⚡ CH: 23 · LOCKED</div>
+          <div class="screen-line" id="screen-frames">📦 FRAMES: 0</div>
+        </div>
+      </div>
+      <button class="device-btn" onclick="toggleTransmit()" title="زر PTT"></button>
+      <div class="device-speaker"></div>
+      <div class="device-mic"></div>
+    </div>
+  </div>
+
+  <!-- Frequencies -->
+  <div class="card">
+    <div class="ctitle">📻 الترددان الفعليان</div>
+    <div class="freq-dial" style="margin-bottom:.7rem">
+      <div class="freq-num" id="freq1Num" style="color:var(--cyan)">868.0</div>
+      <div class="freq-unit">MHz — النطاق الأول (LoRa EU ISM)</div>
+      <div class="freq-bar" style="background:linear-gradient(90deg,var(--cyan),var(--blue))"></div>
+    </div>
+    <div class="freq-dial">
+      <div class="freq-num" id="freq2Num" style="color:var(--green)">433.5</div>
+      <div class="freq-unit">MHz — النطاق الثاني (ISM 433)</div>
+      <div class="freq-bar" style="background:linear-gradient(90deg,var(--green),var(--cyan))"></div>
+    </div>
+    <div style="margin-top:.8rem;font-size:.72rem;color:var(--muted);line-height:1.7">
+      ADF4352: <span style="color:var(--cyan)">137.5 MHz → 4.4 GHz</span><br>
+      مدى فريد يغطي UHF, SHF, ISM<br>
+      دقة: <span style="color:var(--green)">1 Hz (PLL Integer mode)</span>
+    </div>
+  </div>
+
+  <!-- Signal Path -->
+  <div class="card">
+    <div class="ctitle">🔗 مسار الإشارة</div>
+    <div style="font-size:.72rem;display:flex;flex-direction:column;gap:5px">
+      <div class="sig-block mic" style="width:100%">🎙️ INMP441 (I2S Mic)</div>
+      <div style="text-align:center;color:var(--muted)">▼ I2S DMA</div>
+      <div class="sig-block codec" style="width:100%">⚙️ ESP32-S3 + Codec2</div>
+      <div style="text-align:center;color:var(--muted)">▼ I2C 400kHz</div>
+      <div class="sig-block enc" style="width:100%">🔒 ATECC608A AES-GCM</div>
+      <div style="text-align:center;color:var(--muted)">▼ SPI</div>
+      <div class="sig-block pll" style="width:100%">📡 ADF4352 PLL</div>
+      <div style="text-align:center;color:var(--muted)">▼ RF Out</div>
+      <div class="sig-block pa" style="width:100%">⚡ MAAM-007221 PA</div>
+      <div style="text-align:center;color:var(--muted)">▼ 50Ω Balun</div>
+      <div class="sig-block ant" style="width:100%">📶 AE1 / AE2 Antenna</div>
+    </div>
+  </div>
+
+</div>
+```
+
+  </div>
+</div>
+
+<!-- ════ PAGE 3: ERRORS ════ -->
+
+<div class="page" id="page-errors">
+  <div class="grid2">
+    <div class="card">
+      <div class="ctitle">🔴 الأخطاء المكتشفة في المخطط الأصلي</div>
+      <div class="err-list">
+        <div class="err-item err"><span class="err-ico">🔴</span><div><div class="err-title">مكثفات تجاوز VCC مفقودة — ADF4352</div><div class="err-desc">مداخل طاقة VPLL، VVCO، VCC للـADF4352 تفتقر إلى مكثفات 100nF + 10µF لكل منفذ. بدونها: ضوضاء طور عالية + عدم استقرار PLL + تسرب إشارة بين الترددين.</div></div></div>
+        <div class="err-item err"><span class="err-ico">🔴</span><div><div class="err-title">مقاومات سحب I2C مفقودة — ATECC608A</div><div class="err-desc">خطا SDA و SCL للشريحة ATECC608A يفتقران إلى مقاومتَي سحب 4.7kΩ إلى VCC 3.3V. بدونهما: فشل اتصال I2C عند ترددات 400kHz.</div></div></div>
+        <div class="err-item err"><span class="err-ico">🔴</span><div><div class="err-title">Balun مفقود في مخرج ADF4352 التفاضلي</div><div class="err-desc">RF_OUT+ و RF_OUT- للـADF4352 مخرج تفاضلي (100Ω diff). ربطه مباشرة بالهوائي (50Ω single-ended) يسبب فقدان 6dB في الطاقة + خلل في التطابق.</div></div></div>
+        <div class="err-item err"><span class="err-ico">🔴</span><div><div class="err-title">دائرة تحيز MAAM-007221 ناقصة</div><div class="err-desc">المُضخِّم MMIC يتطلب دائرة تحيز نشطة (Active Bias) أو مقاومات تحيز دقيقة. الربط المباشر يُخاطر بتدمير الشريحة بسبب التيار الزائد.</div></div></div>
+        <div class="err-item err"><span class="err-ico">🔴</span><div><div class="err-title">عازل RF مفقود بين المُضخِّم والمرشح</div><div class="err-desc">بدون عازل (Isolator) أو مطابق تعادل بين PA وFL1، تنعكس الطاقة RF وتُتلف المُضخِّم عند عدم توصيل الهوائي.</div></div></div>
+        <div class="err-item warn"><span class="err-ico">🟡</span><div><div class="err-title">مرجع TCXO غير مُعزَّز (KT25204-T)</div><div class="err-desc">مرجع التذبذب للـADF4352 يحتاج مكثف تجاوز 100nF مباشرة على منفذ الطاقة، وكابل مباشر إلى REFIN بأقل تشعب ممكن.</div></div></div>
+        <div class="err-item warn"><span class="err-ico">🟡</span><div><div class="err-title">خطوط SPI بدون مقاومات سلسلة</div><div class="err-desc">خطوط CLK، DATA، LE بين ESP32-S3 وADF4352 بدون مقاومات 33Ω–100Ω لتقليل الانعكاسات وإخماد التذبذبات.</div></div></div>
+        <div class="err-item warn"><span class="err-ico">🟡</span><div><div class="err-title">شبكة مطابقة ADA4898-2 غير محددة</div><div class="err-desc">مكوّن ADA4898-2 (Op-Amp عالي السرعة) يفتقر إلى شبكة ردود فعل (Feedback Network) واضحة. الكسب والحيز غير محددَين.</div></div></div>
+        <div class="err-item warn"><span class="err-ico">🟡</span><div><div class="err-title">LD33221 غير مرئي في المخطط</div><div class="err-desc">اسم U8 غير واضح. إذا كان منظِّم طاقة: يحتاج مكثفات CIN/COUT، وديود حماية انعكاس تيار.</div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ctitle">🟢 الإصلاحات المطبَّقة + الإضافات الجديدة</div>
+      <div class="err-list">
+        <div class="err-item fix"><span class="err-ico">✅</span><div><div class="err-title">إضافة شبكة تجاوز كاملة لـADF4352</div><div class="err-desc">تم إضافة 100nF + 10µF لكل منفذ طاقة (VPLL, VVCO, VCC, CPOUT). كذلك مقاوم تثبيت 330Ω على خط CPOUT.</div></div></div>
+        <div class="err-item fix"><span class="err-ico">✅</span><div><div class="err-title">مقاومتا سحب I2C 4.7kΩ للـATECC608A</div><div class="err-desc">R_SDA = R_SCL = 4.7kΩ من VCC 3.3V. يضمن مستويات منطقية صحيحة عند 400kHz Fast-Mode.</div></div></div>
+        <div class="err-item fix"><span class="err-ico">✅</span><div><div class="err-title">Balun 1:1 (100Ω→50Ω) في مخرج RF</div><div class="err-desc">تم إضافة محول تحويل تفاضلي-أحادي (Balun TCM1-83X+ or equivalent) بين RF_OUT+/- والمُضخِّم. يحقق مطابقة 50Ω كاملة.</div></div></div>
+        <div class="err-item fix"><span class="err-ico">✅</span><div><div class="err-title">دائرة تحيز نشطة للـMAM-007221</div><div class="err-desc">تم إضافة مقاومة تحيز R_BIAS = 100Ω + مكثف تجاوز C_BIAS = 100pF على خط VCC_PA مع إضافة مقاومة إطفاء 0Ω قابلة للإزالة.</div></div></div>
+        <div class="err-item fix"><span class="err-ico">✅</span><div><div class="err-title">مقاومات سلسلة SPI 33Ω</div><div class="err-desc">تم إضافة R_CLK = R_DATA = R_LE = 33Ω على خطوط SPI للحد من انعكاسات الموجة وتقليل EMI.</div></div></div>
+        <div class="err-item add"><span class="err-ico">⊕</span><div><div class="err-title">ميكروفون INMP441 (I2S) — إضافة جديدة</div><div class="err-desc">ربط عبر I2S: SCK=GPIO12، WS=GPIO13، SD=GPIO11. معدل عينات 8kHz، 24-bit، SNR=60dB. مع مكثف تجاوز 100nF على VCC.</div></div></div>
+        <div class="err-item add"><span class="err-ico">⊕</span><div><div class="err-title">مكبر صوت MAX98357A (Class-D) — إضافة جديدة</div><div class="err-desc">ربط عبر I2S: BCLK=GPIO14، LRC=GPIO16، DIN=GPIO17. إخراج 3.2W على 4Ω. كسب افتراضي +9dB. مرشح EMI خارجي.</div></div></div>
+        <div class="err-item add"><span class="err-ico">⊕</span><div><div class="err-title">شاشة ST7789V TFT 240×240 — إضافة جديدة</div><div class="err-desc">ربط عبر SPI2: SCK=GPIO18، MOSI=GPIO23، CS=GPIO15، DC=GPIO2، RST=GPIO4. مع مكثف 10µF على منفذ VCC 3.3V.</div></div></div>
+        <div class="err-item add"><span class="err-ico">⊕</span><div><div class="err-title">ثقوب تأريض بين الطبقات (Via Stitching)</div><div class="err-desc">إضافة ثقوب تأريض بكثافة 1 ثقب/cm² حول المسارات RF والـPLL لمنع الاهتزازات الأرضية وتقليل EMI.</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 4: SPECS ════ -->
+
+<div class="page" id="page-specs">
+  <div class="card" style="margin-bottom:1rem">
+    <div class="ctitle">📋 جدول المكوّنات الكاملة — النسخة المُصحَّحة</div>
+    <div style="overflow-x:auto">
+      <table class="spec-table">
+        <thead><tr><th>المرجع</th><th>الشريحة</th><th>الوظيفة</th><th>الواجهة</th><th>الحالة</th></tr></thead>
+        <tbody>
+          <tr><td class="spec-id">U9</td><td class="spec-comp">ESP32-S3</td><td class="spec-desc">معالج رئيسي ثنائي النواة 240MHz + WiFi/BT</td><td><span class="tag tc">SPI</span><span class="tag tc">I2S</span><span class="tag tc">I2C</span></td><td><span class="tag tg">✓ أصلي</span></td></tr>
+          <tr><td class="spec-id">U7</td><td class="spec-comp">ADF4352</td><td class="spec-desc">مُولِّد PLL وسيع النطاق 137.5MHz–4.4GHz</td><td><span class="tag tc">SPI</span></td><td><span class="tag ta">⚡ مُصحَّح</span></td></tr>
+          <tr><td class="spec-id">U1</td><td class="spec-comp">ATECC608A</td><td class="spec-desc">تشفير عتادي ECDH + AES-GCM + TRNG</td><td><span class="tag tc">I2C</span></td><td><span class="tag ta">⚡ مُصحَّح</span></td></tr>
+          <tr><td class="spec-id">U6</td><td class="spec-comp">MAAM-007221</td><td class="spec-desc">مُضخِّم MMIC 50MHz–6GHz، كسب 13dB</td><td><span class="tag tc">RF</span></td><td><span class="tag ta">⚡ مُصحَّح</span></td></tr>
+          <tr><td class="spec-id">U5</td><td class="spec-comp">SKY65404</td><td class="spec-desc">مبدِّل RF ثنائي SPDT لاختيار الهوائي</td><td><span class="tag tc">GPIO</span></td><td><span class="tag tg">✓ أصلي</span></td></tr>
+          <tr><td class="spec-id">U3</td><td class="spec-comp">KT25204-T</td><td class="spec-desc">مذبذب مرجعي TCXO ±0.5ppm</td><td><span class="tag tc">CLK</span></td><td><span class="tag ta">⚡ مُصحَّح</span></td></tr>
+          <tr><td class="spec-id">U2</td><td class="spec-comp">SKB?-L40</td><td class="spec-desc">مرشح تمرير نطاق 868MHz أو LNA</td><td><span class="tag tc">RF</span></td><td><span class="tag tg">✓ أصلي</span></td></tr>
+          <tr><td class="spec-id">FL1,FL2</td><td class="spec-comp">LFCN-490</td><td class="spec-desc">مرشح تمرير منخفض، fc=490MHz</td><td><span class="tag tc">RF</span></td><td><span class="tag tg">✓ أصلي</span></td></tr>
+          <tr><td class="spec-id">AE1</td><td class="spec-comp">هوائي رئيسي</td><td class="spec-desc">هوائي 868MHz، 50Ω، SMA</td><td><span class="tag tc">RF</span></td><td><span class="tag tg">✓ أصلي</span></td></tr>
+          <tr><td class="spec-id">AE2</td><td class="spec-comp">هوائي ثانوي</td><td class="spec-desc">هوائي 433MHz، 50Ω، SMA</td><td><span class="tag tc">RF</span></td><td><span class="tag tg">✓ أصلي</span></td></tr>
+          <tr><td class="spec-id">U10 ★</td><td class="spec-comp">MAX98357A</td><td class="spec-desc">مكبر صوت Class-D، 3.2W، I2S</td><td><span class="tag tc">I2S</span></td><td><span class="tag tp">★ جديد</span></td></tr>
+          <tr><td class="spec-id">MIC ★</td><td class="spec-comp">INMP441</td><td class="spec-desc">ميكروفون MEMS رقمي، 24-bit، 60dB SNR</td><td><span class="tag tc">I2S</span></td><td><span class="tag tp">★ جديد</span></td></tr>
+          <tr><td class="spec-id">LCD ★</td><td class="spec-comp">ST7789V</td><td class="spec-desc">شاشة TFT 240×240، 262K ألوان</td><td><span class="tag tc">SPI</span></td><td><span class="tag tp">★ جديد</span></td></tr>
+          <tr><td class="spec-id">BAL1 ★</td><td class="spec-comp">Balun 1:1</td><td class="spec-desc">تحويل تفاضلي→أحادي، 100Ω→50Ω</td><td><span class="tag tc">RF</span></td><td><span class="tag tp">★ جديد</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="ctitle">⚡ مواصفات الأداء الكاملة</div>
+      <table class="spec-table">
+        <thead><tr><th>المعامل</th><th>القيمة</th></tr></thead>
+        <tbody>
+          <tr><td>نطاق التردد الأول</td><td class="spec-id">868.0 – 869.0 MHz</td></tr>
+          <tr><td>نطاق التردد الثاني</td><td class="spec-id">433.0 – 434.8 MHz</td></tr>
+          <tr><td>نطاق ADF4352 الكامل</td><td class="spec-id">137.5 MHz – 4.4 GHz</td></tr>
+          <tr><td>طاقة الإرسال</td><td class="spec-id">+27 dBm (500 mW)</td></tr>
+          <tr><td>كسب المُضخِّم MMIC</td><td class="spec-id">+13 dB (50MHz–6GHz)</td></tr>
+          <tr><td>حساسية الاستقبال</td><td class="spec-id">-141 dBm @ SF12</td></tr>
+          <tr><td>التشفير</td><td class="spec-id">AES-128-GCM (HW)</td></tr>
+          <tr><td>جودة الصوت (MOS)</td><td class="spec-id">3.8 @ 1200 bps</td></tr>
+          <tr><td>زمن الإرسال (ToA)</td><td class="spec-id">~21 ms / 26-byte VDF</td></tr>
+          <tr><td>المدى الحضري</td><td class="spec-id">2–5 km</td></tr>
+          <tr><td>المدى الريفي (LOS)</td><td class="spec-id">15–30 km</td></tr>
+          <tr><td>القفز الترددي FHSS</td><td class="spec-id">64 قناة × 100 kHz</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="ctitle">🔌 توزيع الطاقة وتوصيل GPIO</div>
+      <table class="spec-table">
+        <thead><tr><th>الإشارة</th><th>GPIO</th><th>الوحدة</th></tr></thead>
+        <tbody>
+          <tr><td>I2S SCK (Mic)</td><td class="spec-id">GPIO 12</td><td>INMP441</td></tr>
+          <tr><td>I2S WS (Mic)</td><td class="spec-id">GPIO 13</td><td>INMP441</td></tr>
+          <tr><td>I2S SD (Mic)</td><td class="spec-id">GPIO 11</td><td>INMP441</td></tr>
+          <tr><td>I2S BCLK (Spk)</td><td class="spec-id">GPIO 14</td><td>MAX98357A</td></tr>
+          <tr><td>I2S LRC (Spk)</td><td class="spec-id">GPIO 16</td><td>MAX98357A</td></tr>
+          <tr><td>I2S DIN (Spk)</td><td class="spec-id">GPIO 17</td><td>MAX98357A</td></tr>
+          <tr><td>SPI SCK (LCD)</td><td class="spec-id">GPIO 18</td><td>ST7789V</td></tr>
+          <tr><td>SPI MOSI (LCD)</td><td class="spec-id">GPIO 23</td><td>ST7789V</td></tr>
+          <tr><td>SPI CS (LCD)</td><td class="spec-id">GPIO 15</td><td>ST7789V</td></tr>
+          <tr><td>I2C SDA (Crypto)</td><td class="spec-id">GPIO 5</td><td>ATECC608A</td></tr>
+          <tr><td>I2C SCL (Crypto)</td><td class="spec-id">GPIO 6</td><td>ATECC608A</td></tr>
+          <tr><td>SPI (ADF4352)</td><td class="spec-id">GPIO 19,25,26</td><td>ADF4352</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  G-80 RF SIMULATION ENGINE
+// ══════════════════════════════════════════════════════════
+
+// ── PAGE MANAGEMENT ───────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.target.classList.add('active');
+  if(id==='schematic') setTimeout(drawSchematic,100);
+  if(id==='simulation') initSimulation();
+}
+
+// ══════════════════════════════════════════════════════════
+//  SCHEMATIC DRAWING
+// ══════════════════════════════════════════════════════════
+const SCH = {
+  showErrors:true, showFixes:true,
+  animating:false, signalPos:0
+};
+let schCanvas, schCtx;
+
+const COMPS = {
+  esp32:{x:90,y:160,w:160,h:240,color:'#ffd700',label:'ESP32-S3',sub:'U9',
+    gpio:['GPIO0..39','I2S','SPI','I2C','UART'],
+    info:{name:'ESP32-S3 (U9)',role:'المعالج الرئيسي',cpu:'Xtensa LX7 Dual 240MHz',ram:'512KB SRAM + 8MB PSRAM',interfaces:'SPI/I2S/I2C/UART/USB-OTG',power:'3.3V @ ~240mA active'}},
+  atecc:{x:15,y:190,w:65,h:50,color:'#7c4dff',label:'ATECC608A',sub:'U1',
+    info:{name:'ATECC608A (U1)',role:'تشفير عتادي',interface:'I2C 400kHz',keys:'16 slots OTP',crypto:'ECDH P-256 + AES-128-GCM + TRNG',power:'3.3V @ 1.3mA / 150nA sleep'}},
+  adf4352:{x:310,y:140,w:155,h:200,color:'#00bcd4',label:'ADF4352',sub:'U7',
+    info:{name:'ADF4352 (U7)',role:'مُولِّد PLL وسيع النطاق',range:'137.5 MHz – 4.4 GHz',interface:'SPI 3-wire',phaseNoise:'-90 dBc/Hz @1kHz',power:'VPLL 3.3V + VVCO 3.3V'}},
+  maam:{x:530,y:120,w:90,h:60,color:'#00c853',label:'MAAM-007221',sub:'U6',
+    info:{name:'MAAM-007221 (U6)',role:'مُضخِّم MMIC',gain:'+13 dB',freq:'50 MHz – 6 GHz',nf:'2.4 dB',p1db:'+18 dBm',power:'3.3-5V'}},
+  sky:{x:500,y:240,w:85,h:50,color:'#ff5722',label:'SKY65404',sub:'U5',
+    info:{name:'SKY65404 (U5)',role:'مبدِّل RF ثنائي SPDT',isolation:'>35 dB',loss:'<0.7 dB',freq:'DC – 3 GHz',control:'GPIO ESP32'}},
+  fl1:{x:480,y:80,w:40,h:30,color:'#9c27b0',label:'FL1',sub:'LFCN-490',
+    info:{name:'LFCN-490 (FL1)',role:'مرشح تمرير منخفض',cutoff:'490 MHz',insertion:'<0.5 dB',rejection:'>40 dB @>600MHz'}},
+  fl2:{x:620,y:100,w:40,h:30,color:'#9c27b0',label:'FL2',sub:'LFCN-490',
+    info:{name:'LFCN-490 (FL2)',role:'مرشح تمرير منخفض',cutoff:'490 MHz',insertion:'<0.5 dB',rejection:'>40 dB @>600MHz'}},
+  tcxo:{x:310,y:380,w:85,h:45,color:'#ff9800',label:'KT25204-T',sub:'TCXO',
+    info:{name:'KT25204-T (U3)',role:'مذبذب مرجعي TCXO',freq:'10 MHz ref',accuracy:'±0.5 ppm',output:'CMOS square wave'}},
+  ant1:{x:700,y:70,w:60,h:40,color:'#c9a84c',label:'AE1',sub:'868MHz',
+    info:{name:'هوائي AE1',role:'هوائي إرسال/استقبال رئيسي',freq:'868 MHz ISM',gain:'8 dBi',vswr:'<1.5',impedance:'50Ω SMA'}},
+  ant2:{x:700,y:170,w:60,h:40,color:'#c9a84c',label:'AE2',sub:'433MHz',
+    info:{name:'هوائي AE2',role:'هوائي ثانوي 433MHz',freq:'433 MHz ISM',gain:'5 dBi',vswr:'<2.0',impedance:'50Ω SMA'}},
+  mic:{x:90,y:430,w:80,h:50,color:'#ff9800',label:'INMP441',sub:'MIC ★',
+    info:{name:'INMP441 (MIC ★)',role:'ميكروفون MEMS رقمي جديد',interface:'I2S 24-bit',snr:'60 dB',sensitivity:'-26 dBFS',power:'1.8-3.3V @ 1.4mA'}},
+  spk:{x:90,y:500,w:80,h:45,color:'#ff9800',label:'MAX98357A',sub:'U10 ★',
+    info:{name:'MAX98357A (U10 ★)',role:'مكبر صوت Class-D جديد',interface:'I2S input',power:'3.2W @ 4Ω',gain:'+9 dB default',efficiency:'92%',supply:'2.7-5.5V'}},
+  lcd:{x:200,y:430,w:80,h:60,color:'#00e676',label:'ST7789V',sub:'LCD ★',
+    info:{name:'ST7789V (LCD ★)',role:'شاشة TFT 240×240 جديدة',interface:'SPI 4-wire',resolution:'240×240 px',colors:'262K (18-bit)',voltage:'3.3V'}},
+  balun:{x:490,y:170,w:60,h:35,color:'#e91e63',label:'BAL1',sub:'Balun ★',
+    info:{name:'Balun 1:1 (BAL1 ★)',role:'تحويل تفاضلي→أحادي جديد',ratio:'100Ω diff → 50Ω SE',loss:'<0.5 dB',freq:'500MHz–4GHz'}},
+};
+
+function drawSchematic() {
+  schCanvas = document.getElementById('sch-canvas');
+  if(!schCanvas) return;
+  schCtx = schCanvas.getContext('2d');
+  const W = schCanvas.offsetWidth;
+  schCanvas.width = W; schCanvas.height = 600;
+  schCtx.clearRect(0,0,W,600);
+  drawBackground();
+  drawWires();
+  drawComponents();
+  if(SCH.showErrors) drawErrors();
+  if(SCH.showFixes) drawFixes();
+}
+
+function drawBackground() {
+  const c = schCtx, W = schCanvas.width;
+  c.fillStyle = '#f8f9fa'; c.fillRect(0,0,W,600);
+  c.strokeStyle = '#e8ecf0'; c.lineWidth = 0.5;
+  for(let x=0;x<W;x+=20){c.beginPath();c.moveTo(x,0);c.lineTo(x,600);c.stroke()}
+  for(let y=0;y<600;y+=20){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
+  // Border
+  c.strokeStyle = '#cdd'; c.lineWidth = 2;
+  c.strokeRect(5,5,W-10,590);
+  // Title block
+  c.fillStyle = '#e8ecf0'; c.fillRect(0,565,W,35);
+  c.fillStyle = '#333'; c.font = 'bold 11px JetBrains Mono';
+  c.fillText('G-80 RF DUAL-BAND TRANSCEIVER — CORRECTED SCHEMATIC v2.0', 10, 585);
+  c.fillText('ESP32-S3 + ADF4352 + ATECC608A + INMP441 + MAX98357A + ST7789V', 10, 597);
+}
+
+function drawWires() {
+  const c = schCtx;
+  c.lineWidth = 1.5;
+  // ESP32 → ATECC608A (I2C green)
+  c.strokeStyle = '#388e3c'; c.setLineDash([]);
+  c.beginPath(); c.moveTo(90,220); c.lineTo(80,220); c.stroke();
+  drawArrow(c, 80,220,'left','#388e3c');
+  // ESP32 → ADF4352 (SPI blue)
+  c.strokeStyle = '#1565c0';
+  c.beginPath(); c.moveTo(250,200); c.lineTo(310,200); c.stroke();
+  drawArrow(c, 310,200,'right','#1565c0');
+  // ADF4352 → Balun (RF cyan)
+  c.strokeStyle = '#00bcd4'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(465,200); c.lineTo(490,200); c.stroke();
+  // Balun → SKY65404 (RF)
+  c.beginPath(); c.moveTo(550,200); c.lineTo(500,265); c.stroke();
+  // SKY65404 → AE1
+  c.beginPath(); c.moveTo(585,255); c.lineTo(660,255); c.lineTo(700,90); c.stroke();
+  drawArrow(c,700,90,'right','#00bcd4');
+  // SKY65404 → AE2
+  c.beginPath(); c.moveTo(585,265); c.lineTo(700,190); c.stroke();
+  drawArrow(c,700,190,'right','#00bcd4');
+  // MAAM → FL1
+  c.beginPath(); c.moveTo(530,140); c.lineTo(520,95); c.stroke();
+  // FL1 → FL2
+  c.beginPath(); c.moveTo(520,80); c.lineTo(620,115); c.stroke();
+  // FL2 → AE1
+  c.beginPath(); c.moveTo(660,115); c.lineTo(700,80); c.stroke();
+  // ADF4352 → MAAM
+  c.beginPath(); c.moveTo(465,180); c.lineTo(530,150); c.stroke();
+  // TCXO → ADF4352
+  c.strokeStyle = '#ff9800';
+  c.beginPath(); c.moveTo(395,380); c.lineTo(395,340); c.stroke();
+  drawArrow(c,395,340,'up','#ff9800');
+  // ESP32 → MIC (I2S orange)
+  c.strokeStyle = '#ff9800'; c.lineWidth=1.5;
+  c.beginPath(); c.moveTo(150,430); c.lineTo(150,410); c.lineTo(170,410); c.stroke();
+  // ESP32 → Speaker
+  c.beginPath(); c.moveTo(130,500); c.lineTo(130,490); c.lineTo(90,490); c.stroke();
+  // ESP32 → LCD
+  c.strokeStyle = '#00e676';
+  c.beginPath(); c.moveTo(200,430); c.lineTo(200,420); c.lineTo(250,420); c.stroke();
+  c.setLineDash([]);
+}
+
+function drawArrow(c, x, y, dir, color) {
+  c.fillStyle = color; c.beginPath();
+  if(dir==='right'){c.moveTo(x,y-4);c.lineTo(x+8,y);c.lineTo(x,y+4)}
+  else if(dir==='left'){c.moveTo(x,y-4);c.lineTo(x-8,y);c.lineTo(x,y+4)}
+  else if(dir==='up'){c.moveTo(x-4,y);c.lineTo(x,y-8);c.lineTo(x+4,y)}
+  c.closePath(); c.fill();
+}
+
+function drawComponents() {
+  Object.entries(COMPS).forEach(([key,comp])=>{
+    drawComp(comp, key);
+  });
+}
+
+function drawComp(comp, key) {
+  const c = schCtx, {x,y,w,h,color,label,sub} = comp;
+  // Shadow
+  c.fillStyle = 'rgba(0,0,0,0.15)';
+  c.fillRect(x+3,y+3,w,h);
+  // Fill
+  c.fillStyle = hexToRgba(color, 0.12);
+  c.fillRect(x,y,w,h);
+  // Border
+  c.strokeStyle = color; c.lineWidth = 1.5;
+  c.setLineDash([]);
+  // New components dashed border
+  if(sub.includes('★')) { c.setLineDash([4,2]); c.lineWidth=2; }
+  c.strokeRect(x,y,w,h);
+  c.setLineDash([]);
+  // Label
+  c.fillStyle = '#111'; c.font = `bold ${Math.min(11, w/label.length*1.6)}px JetBrains Mono`;
+  c.textAlign = 'center';
+  c.fillText(label, x+w/2, y+h/2);
+  c.font = '9px JetBrains Mono'; c.fillStyle = '#555';
+  c.fillText(sub, x+w/2, y+h/2+13);
+  // NEW badge
+  if(sub.includes('★')) {
+    c.fillStyle = '#00c853'; c.font = 'bold 8px sans-serif';
+    c.fillText('NEW', x+w-18, y+10);
+  }
+  c.textAlign = 'left';
+  // Click handler stored
+  comp._bounds = {x,y,w,h};
+}
+
+function drawErrors() {
+  const c = schCtx;
+  const errors = [
+    {x:310,y:240,label:'⚠ No Bypass Caps'},
+    {x:15,y:170,label:'⚠ No I2C Pull-ups'},
+    {x:465,y:190,label:'⚠ No Balun'},
+    {x:530,y:100,label:'⚠ No Bias Circuit'},
+  ];
+  errors.forEach(e=>{
+    c.fillStyle = 'rgba(255,23,68,0.9)';
+    c.beginPath(); c.arc(e.x+6,e.y+6,8,0,Math.PI*2); c.fill();
+    c.fillStyle = '#fff'; c.font = 'bold 9px sans-serif'; c.textAlign='center';
+    c.fillText('!', e.x+6, e.y+10); c.textAlign='left';
+    c.fillStyle = 'rgba(255,23,68,0.85)';
+    const tw = c.measureText(e.label).width + 8;
+    c.fillRect(e.x+16,e.y,tw,16);
+    c.fillStyle = '#fff'; c.font = '8px JetBrains Mono';
+    c.fillText(e.label, e.x+20, e.y+11);
+  });
+}
+
+function drawFixes() {
+  const c = schCtx;
+  const fixes = [
+    {x:310,y:300,label:'✓ 100nF+10µF Added'},
+    {x:15,y:155,label:'✓ 4.7kΩ Pull-ups'},
+    {x:490,y:172,label:'✓ Balun 1:1'},
+    {x:530,y:180,label:'✓ Bias Network'},
+  ];
+  fixes.forEach(f=>{
+    c.fillStyle = 'rgba(0,200,83,0.85)';
+    const tw = c.measureText(f.label).width + 8;
+    c.fillRect(f.x,f.y,tw,14);
+    c.fillStyle = '#000'; c.font = '8px JetBrains Mono';
+    c.fillText(f.label, f.x+4, f.y+10);
+  });
+}
+
+function hexToRgba(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ── SCHEMATIC CONTROLS ────────────────────────────────────
+let showErr=true, showFix=true;
+function toggleErrors(){ showErr=!showErr; SCH.showErrors=showErr; drawSchematic(); }
+function toggleFixes(){ showFix=!showFix; SCH.showFixes=showFix; drawSchematic(); }
+function resetSchematic(){ showErr=true; showFix=true; SCH.showErrors=true; SCH.showFixes=true; drawSchematic(); }
+
+function animateSignal() {
+  SCH.signalPos = 0; SCH.animating = true;
+  const path = [{x:170,y:220},{x:250,y:220},{x:310,y:220},{x:465,y:220},
+                {x:490,y:220},{x:550,y:200},{x:585,y:260},{x:700,y:90}];
+  let i = 0;
+  function step() {
+    if(i >= path.length-1){ SCH.animating=false; return; }
+    const from=path[i], to=path[i+1];
+    drawSchematic();
+    const c = schCtx;
+    c.strokeStyle='rgba(255,255,0,0.9)'; c.lineWidth=3; c.setLineDash([6,3]);
+    c.beginPath(); c.moveTo(from.x,from.y); c.lineTo(to.x,to.y); c.stroke();
+    c.setLineDash([]);
+    c.fillStyle='#ffff00'; c.beginPath(); c.arc(to.x,to.y,5,0,Math.PI*2); c.fill();
+    i++; setTimeout(step, 300);
+  }
+  step();
+}
+
+// ── COMPONENT INFO ────────────────────────────────────────
+document.getElementById('sch-canvas')?.addEventListener('click', e=>{
+  const rect = schCanvas.getBoundingClientRect();
+  const sx = (e.clientX - rect.left) * (schCanvas.width/rect.width);
+  const sy = (e.clientY - rect.top) * (schCanvas.height/rect.height);
+  Object.entries(COMPS).forEach(([key,comp])=>{
+    if(sx>=comp.x && sx<=comp.x+comp.w && sy>=comp.y && sy<=comp.y+comp.h){
+      showComp(key);
+    }
+  });
+});
+
+function showComp(key) {
+  const comp = COMPS[key]; if(!comp||!comp.info) return;
+  const info = comp.info;
+  const el = document.getElementById('compInfo');
+  let html = `<div class="comp-name" style="color:${comp.color}">${info.name}</div>`;
+  Object.entries(info).forEach(([k,v])=>{
+    if(k==='name') return;
+    html += `<div class="comp-row"><span class="comp-key">${k}</span><span class="comp-val">${v}</span></div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════
+//  SIMULATION ENGINE
+// ══════════════════════════════════════════════════════════
+let SIM = {
+  tx:false, band:0, frame:0, fhssCh:23,
+  freq:[868.0, 433.5], rssi:-68, batt:87, encPhase:0
+};
+let wavePhase=0, fhssPhase=0, encPhase=0;
+let animFrameId=null;
+
+function initSimulation() {
+  if(animFrameId) return;
+  drawSimLoop();
+  setInterval(updateScreenInfo, 500);
+  setInterval(updateLiveStats, 2000);
+}
+
+function drawSimLoop() {
+  drawMainSim();
+  drawWaveform();
+  drawEncWave();
+  drawFHSS();
+  wavePhase += SIM.tx ? 0.12 : 0.02;
+  encPhase  += SIM.tx ? 0.2  : 0.03;
+  fhssPhase += 0.05;
+  animFrameId = requestAnimationFrame(drawSimLoop);
+}
+
+// ── MAIN SIMULATION CANVAS ───────────────────────────────
+function drawMainSim() {
+  const cv = document.getElementById('sim-canvas'); if(!cv) return;
+  const ctx = cv.getContext('2d');
+  cv.width = cv.offsetWidth; cv.height = 560;
+  const W=cv.width, H=cv.height;
+
+  // BG
+  ctx.fillStyle='#030810'; ctx.fillRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle='rgba(0,200,83,.04)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  // Component positions for simulation
+  const cx = W*0.5, cy = H*0.5;
+  const compsPos = {
+    mic:   {x:W*.08, y:H*.25, r:30, c:'#ff9800', l:'🎙️\nINMP441'},
+    esp:   {x:W*.22, y:H*.5,  r:45, c:'#ffd700', l:'⚙️\nESP32-S3'},
+    atec:  {x:W*.22, y:H*.25, r:28, c:'#7c4dff', l:'🔒\nATECC'},
+    adf:   {x:W*.45, y:H*.5,  r:40, c:'#00bcd4', l:'📡\nADF4352'},
+    maam:  {x:W*.62, y:H*.35, r:28, c:'#00c853', l:'⚡\nMAMM'},
+    sky:   {x:W*.62, y:H*.62, r:25, c:'#ff5722', l:'🔀\nSKY'},
+    ant1:  {x:W*.82, y:H*.25, r:22, c:'#c9a84c', l:'📶\nAE1'},
+    ant2:  {x:W*.82, y:H*.62, r:22, c:'#c9a84c', l:'📶\nAE2'},
+    spk:   {x:W*.08, y:H*.72, r:28, c:'#ff9800', l:'🔊\nMAX98357'},
+    lcd:   {x:W*.22, y:H*.8,  r:28, c:'#00e676', l:'📺\nST7789V'},
+    tcxo:  {x:W*.45, y:H*.75, r:22, c:'#ff9800', l:'⏱️\nTCXO'},
+  };
+
+  // Draw connections
+  const conns = [
+    {from:'mic', to:'esp', c:'#ff9800', lbl:'I2S'},
+    {from:'esp', to:'atec', c:'#7c4dff', lbl:'I2C'},
+    {from:'esp', to:'adf', c:'#1565c0', lbl:'SPI'},
+    {from:'esp', to:'spk', c:'#ff9800', lbl:'I2S'},
+    {from:'esp', to:'lcd', c:'#00e676', lbl:'SPI'},
+    {from:'adf', to:'maam', c:'#00bcd4', lbl:'RF'},
+    {from:'adf', to:'sky', c:'#00bcd4', lbl:'RF'},
+    {from:'maam', to:'ant1', c:'#c9a84c', lbl:'50Ω'},
+    {from:'sky', to:'ant2', c:'#c9a84c', lbl:'50Ω'},
+    {from:'tcxo', to:'adf', c:'#ff9800', lbl:'REF'},
+  ];
+
+  conns.forEach(conn=>{
+    const f=compsPos[conn.from], t=compsPos[conn.to];
+    const alpha = SIM.tx ? 0.8 : 0.3;
+    ctx.strokeStyle=conn.c.replace(')',`,${alpha})`).replace('rgb','rgba'); 
+    ctx.lineWidth = SIM.tx && (conn.lbl==='RF'||conn.lbl==='50Ω') ? 3 : 1.5;
+    ctx.setLineDash(SIM.tx && conn.lbl==='I2S' ? [4,4] : []);
+    ctx.beginPath(); ctx.moveTo(f.x,f.y); ctx.lineTo(t.x,t.y); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Animated signal particles on active conns
+    if(SIM.tx) {
+      const t2 = ((Date.now()/1000*2) % 1);
+      const px = f.x + (t.x-f.x)*t2, py = f.y + (t.y-f.y)*t2;
+      ctx.fillStyle = conn.c;
+      ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=10; ctx.shadowColor=conn.c;
+      ctx.beginPath(); ctx.arc(px,py,2,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+    }
+
+    // Label
+    const mx=(f.x+t.x)/2, my=(f.y+t.y)/2;
+    ctx.fillStyle=conn.c; ctx.font='10px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText(conn.lbl, mx, my-5); ctx.textAlign='left';
+  });
+
+  // Draw component circles
+  Object.entries(compsPos).forEach(([k,cp])=>{
+    const active = SIM.tx;
+    // Glow
+    if(active) {
+      ctx.shadowBlur=20; ctx.shadowColor=cp.c;
+    }
+    ctx.fillStyle=hexToRgbaS(cp.c, active?0.3:0.12);
+    ctx.beginPath(); ctx.arc(cp.x,cp.y,cp.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=cp.c; ctx.lineWidth=active?2.5:1.5;
+    ctx.beginPath(); ctx.arc(cp.x,cp.y,cp.r,0,Math.PI*2); ctx.stroke();
+    ctx.shadowBlur=0;
+
+    // FHSS animation on ADF4352
+    if(k==='adf' && active) {
+      const rings = 3;
+      for(let i=0;i<rings;i++){
+        const r2 = cp.r + (i+1)*15 + (Date.now()/30%(30));
+        ctx.strokeStyle=`rgba(0,188,212,${0.4-i*0.12})`;
+        ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.arc(cp.x,cp.y,r2,0,Math.PI*2); ctx.stroke();
+      }
+    }
+
+    // Label
+    ctx.fillStyle=active?'#fff':'rgba(255,255,255,0.6)';
+    ctx.font=`${Math.max(9,cp.r/3.5)}px JetBrains Mono`;
+    ctx.textAlign='center';
+    const lines=cp.l.split('\n');
+    lines.forEach((l,i)=>ctx.fillText(l, cp.x, cp.y-4+(i-lines.length/2+0.7)*13));
+    ctx.textAlign='left';
+  });
+
+  // RF waves from antennas
+  if(SIM.tx) {
+    [compsPos.ant1, compsPos.ant2].forEach((ant,bi)=>{
+      for(let i=1;i<=5;i++){
+        const r = ant.r + i*18 + (Date.now()/50 % 18);
+        const alpha = Math.max(0, 0.5-i*0.1);
+        ctx.strokeStyle=`rgba(201,168,76,${alpha})`;
+        ctx.lineWidth=1;
+        ctx.beginPath(); ctx.arc(ant.x,ant.y,r,0,Math.PI*2); ctx.stroke();
+      }
+      // Frequency label
+      ctx.fillStyle='#c9a84c'; ctx.font='bold 10px JetBrains Mono'; ctx.textAlign='center';
+      ctx.fillText(SIM.band===bi ? `▶ ${SIM.freq[bi].toFixed(1)} MHz` : `${SIM.freq[bi].toFixed(1)} MHz`,
+        ant.x, ant.y+ant.r+22);
+      ctx.textAlign='left';
+    });
+  }
+
+  // Status overlay
+  ctx.fillStyle='rgba(4,6,13,0.7)'; ctx.fillRect(8,8,200,32);
+  ctx.strokeStyle='rgba(201,168,76,0.4)'; ctx.lineWidth=1; ctx.strokeRect(8,8,200,32);
+  ctx.fillStyle='#c9a84c'; ctx.font='bold 10px JetBrains Mono';
+  ctx.fillText(`G-80 · ${SIM.tx?'⚡ TX':'● STANDBY'} · ${SIM.freq[SIM.band].toFixed(1)} MHz`, 15, 28);
+}
+
+function hexToRgbaS(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ── WAVEFORM CANVAS ───────────────────────────────────────
+function drawWaveform() {
+  const cv = document.getElementById('wave-canvas'); if(!cv) return;
+  const ctx = cv.getContext('2d');
+  cv.width=cv.offsetWidth; cv.height=120;
+  const W=cv.width, H=cv.height, mid=H/2;
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H);
+  // Grid lines
+  ctx.strokeStyle='rgba(255,152,0,.1)'; ctx.lineWidth=.5;
+  [H*.25, H*.5, H*.75].forEach(y=>{ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()});
+
+  ctx.strokeStyle = SIM.tx ? '#ff9800' : 'rgba(255,152,0,0.3)';
+  ctx.lineWidth = 1.5; ctx.beginPath();
+  const amp = SIM.tx ? 0.35 : 0.08;
+  for(let x=0;x<W;x++){
+    const t = x/W*4*Math.PI + wavePhase;
+    const v = mid - (Math.sin(t)*0.6 + Math.sin(t*2.1)*0.25 + Math.sin(t*3.7)*0.15) * mid*amp;
+    x===0 ? ctx.moveTo(x,v) : ctx.lineTo(x,v);
+  }
+  ctx.stroke();
+  // Label
+  ctx.fillStyle='rgba(255,152,0,0.7)'; ctx.font='9px JetBrains Mono';
+  ctx.fillText(SIM.tx ? `Codec2 1200bps · Frame ${SIM.frame}` : 'IDLE — مستوى الضوضاء', 6, 14);
+}
+
+// ── ENCRYPTION WAVE ───────────────────────────────────────
+function drawEncWave() {
+  const cv = document.getElementById('enc-canvas'); if(!cv) return;
+  const ctx = cv.getContext('2d');
+  cv.width=cv.offsetWidth; cv.height=120;
+  const W=cv.width, H=cv.height;
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H);
+
+  if(SIM.tx) {
+    // Random-looking encrypted signal
+    ctx.strokeStyle='#7c4dff'; ctx.lineWidth=1.5; ctx.beginPath();
+    const seed = Math.floor(encPhase*10);
+    for(let x=0;x<W;x+=2){
+      const y = H/2 + (Math.sin(x*0.3+encPhase)*20 + Math.sin(x*0.7+encPhase*1.7)*15
+               + Math.sin(x*1.3+encPhase*2.3)*10 + (Math.random()-0.5)*15);
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    // GCM tag animation
+    const tagHex = Array(4).fill(0).map(()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0').toUpperCase()).join('');
+    document.getElementById('encTag').textContent = `Tag: 0x${tagHex}...`;
+    ctx.fillStyle='rgba(124,77,255,0.15)'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(124,77,255,0.3)'; ctx.lineWidth=1;
+    ctx.strokeRect(1,1,W-2,H-2);
+  } else {
+    ctx.fillStyle='rgba(124,77,255,0.1)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(124,77,255,0.5)'; ctx.font='11px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('AES-128-GCM · ATECC608A · مستعد', W/2, H/2+4); ctx.textAlign='left';
+  }
+  ctx.fillStyle='rgba(124,77,255,0.7)'; ctx.font='9px JetBrains Mono';
+  ctx.fillText(SIM.tx?`AES-128-GCM · ECDH P-256 · Frame #${SIM.frame}`:'ATECC608A — محمي عتادياً', 6, 14);
+}
+
+// ── FHSS CANVAS ───────────────────────────────────────────
+function drawFHSS() {
+  const cv = document.getElementById('fhss-canvas'); if(!cv) return;
+  const ctx = cv.getContext('2d');
+  cv.width=cv.offsetWidth; cv.height=100;
+  const W=cv.width, H=cv.height;
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H);
+
+  const bars=64, bw=W/bars;
+  // Spectrum bars
+  for(let i=0;i<bars;i++){
+    const active = i===SIM.fhssCh;
+    const noise = Math.random()*0.15;
+    const h2 = (active?0.85:noise)*H*0.85;
+    const g = ctx.createLinearGradient(0,H-h2,0,H);
+    if(active){g.addColorStop(0,'rgba(255,23,68,1)');g.addColorStop(1,'rgba(255,23,68,0.2)')}
+    else{g.addColorStop(0,`rgba(0,200,83,${noise*3})`);g.addColorStop(1,'rgba(0,200,83,0.05)')}
+    ctx.fillStyle=g;
+    ctx.fillRect(i*bw+0.5, H-h2, bw-1, h2);
+  }
+
+  // Active channel marker
+  ctx.fillStyle='rgba(255,23,68,0.2)'; ctx.fillRect(SIM.fhssCh*bw,0,bw,H);
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=0.5;
+  ctx.beginPath(); ctx.moveTo(0,H-1); ctx.lineTo(W,H-1); ctx.stroke();
+
+  // Labels
+  ctx.fillStyle='rgba(0,200,83,0.7)'; ctx.font='9px JetBrains Mono';
+  const freq = (863 + SIM.fhssCh*0.1).toFixed(1);
+  ctx.fillText(`CH-${SIM.fhssCh} · ${freq}MHz · FHSS LOCKED`, 6, 14);
+}
+
+// ── CONTROLS ─────────────────────────────────────────────
+function toggleTransmit() {
+  SIM.tx = !SIM.tx;
+  const btn = document.getElementById('txBtn');
+  const st  = document.getElementById('txStatus');
+  if(SIM.tx){
+    btn.textContent='⏹ إيقاف'; btn.classList.replace('btn-grn','btn-red');
+    st.style.display='flex';
+    startFHSSHopping();
+  } else {
+    btn.textContent='▶ إرسال'; btn.classList.replace('btn-red','btn-grn');
+    st.style.display='none';
+    if(SIM._hTimer){ clearInterval(SIM._hTimer); SIM._hTimer=null; }
+  }
+  updateScreenInfo();
+}
+
+function startFHSSHopping() {
+  if(SIM._hTimer) clearInterval(SIM._hTimer);
+  SIM._hTimer = setInterval(()=>{
+    SIM.fhssCh = Math.floor(Math.random()*64);
+    SIM.frame++;
+  }, 600);
+}
+
+function toggleBand() {
+  SIM.band = SIM.band===0?1:0;
+  document.getElementById('freq1Num').style.fontWeight = SIM.band===0?'700':'400';
+  document.getElementById('freq2Num').style.fontWeight = SIM.band===1?'700':'400';
+}
+
+function triggerEncrypt() {
+  SIM.encPhase = (SIM.encPhase+1)%4;
+  const el = document.getElementById('encTag');
+  const hex = Array(8).fill(0).map(()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0').toUpperCase()).join('');
+  el.textContent = `Tag: 0x${hex}`;
+}
+
+function updateScreenInfo() {
+  const f = (el,v) => { const e=document.getElementById(el); if(e)e.textContent=v; };
+  f('screen-status', `● ${SIM.tx?'TX ACTIVE':'STANDBY'}`);
+  f('screen-freq', `📡 FREQ: ${SIM.freq[SIM.band].toFixed(1)} MHz`);
+  f('screen-enc', `🔒 AES-GCM: ${SIM.tx?'ENCRYPTING':'ARMED'}`);
+  f('screen-rssi', `📶 RSSI: ${SIM.rssi} dBm`);
+  f('screen-batt', `🔋 BATT: ${SIM.batt}%`);
+  f('screen-ch', `⚡ CH: ${SIM.fhssCh} · ${SIM.tx?'HOPPING':'LOCKED'}`);
+  f('screen-frames', `📦 FRAMES: ${SIM.frame}`);
+}
+
+function updateLiveStats() {
+  SIM.rssi = -68 + Math.floor((Math.random()-0.5)*10);
+  if(SIM.batt>10 && Math.random()<0.1) SIM.batt--;
+  updateScreenInfo();
+}
+
+// ── INIT ────────────────────────────────────────────────
+window.addEventListener('load', ()=>{
+  drawSchematic();
+  initSimulation();
+});
+window.addEventListener('resize', ()=>{ drawSchematic(); });
+</script>
+
+</body>
+</html>
